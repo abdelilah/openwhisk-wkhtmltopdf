@@ -76,8 +76,7 @@ app.post('/run', function(req, res){
         .subscribe(
             result => {
                 res.json({
-                    pdf: new Buffer(fs.readFileSync(pathPDF)).toString('base64'),
-                    payload: req.body
+                    pdf: new Buffer(fs.readFileSync(pathPDF)).toString('base64')
                 })
             }, //res.sendFile(pathPDF),
             error => {
