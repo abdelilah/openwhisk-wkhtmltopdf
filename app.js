@@ -8,9 +8,27 @@ let bodyParser = require('body-parser');
 let Observable = require('rxjs').Observable
 let _ = require('lodash')
 
-app.use(bodyParser.json());
+app.use(bodyParser.json({limit: 10000000}));
 
-let WKHTMLTOPDF = process.env.WKHTMLTOPDF || path.resolve('./wkhtmltox/bin/wkhtmltopdf')
+let WKHTMLTOPDF = process.env.WKHTMLTOPDF || path.resolve('/bin/wkhtmltopdf')
+
+
+const runCommand = (command) => new Promise((resolve, reject) => {
+    console.log("Running command", command);
+    exec(command, (error, stdout, stderr) => {
+        if(error !== null){
+            console.error('Command failed: ' + command)
+            console.log(error)
+            console.log(stdout)
+            console.log(stderr)
+        }
+
+        console.log("Command output", stdout);
+
+        resolve(stdout)
+    })
+}) 
+
  
 app.post('/init', function (req, res) {
    res.status(200).send();       
@@ -19,16 +37,21 @@ app.post('/init', function (req, res) {
 
 
 app.post('/run', function(req, res){
+
     let basePath = os.tmpdir()
     let content = _.get(req.body, 'value.content', '')
     let header = _.get(req.body, 'value.header', null)
     let footer = _.get(req.body, 'value.footer', null)
+    let background = _.get(req.body, 'value.background', null)
     let options = _.get(req.body, 'value.options', '')
 
     let pathPDF = `${basePath}/result.pdf`
     let pathContent = `${basePath}/content.html`
     let pathHeader = `${basePath}/header.html`
     let pathFooter = `${basePath}/footer.html`
+    let pathBackgroundImg = `${basePath}/bg.jpg`
+    let pathBackgroundPdf = `${basePath}/bg.pdf`
+    let pathBackgroundPdfMerged = `${basePath}/bg-mrged.pdf`
 
     let pdfOptions = [options]
     let todo = []
@@ -39,6 +62,18 @@ app.post('/run', function(req, res){
             fs.writeFile(pathContent, content, resolve)
         })
     )
+
+    if(background){
+        todo.push(
+            new Promise((resolve, reject) => {
+                fs.writeFile(pathBackgroundImg, Buffer.from(background, 'base64'), resolve)
+            })
+        )
+
+        todo.push(
+            runCommand(`convert ${pathBackgroundImg} -page A4 ${pathBackgroundPdf}`)
+        )
+    }
 
     if(header){
         pdfOptions.push('--header-html ' + pathHeader)
@@ -58,14 +93,10 @@ app.post('/run', function(req, res){
         )
     }
 
-    let pdfCommand = `${WKHTMLTOPDF} ${_.trim(pdfOptions.join(' '))} ${pathContent} ${pathPDF}`
     todo.push(
-        new Promise(resolve => {
-            exec(pdfCommand, (err, stdout, stderr) => {
-                resolve()
-            })
-        })
+        runCommand(`${WKHTMLTOPDF} ${_.trim(pdfOptions.join(' '))} ${pathContent} ${pathPDF}`)
     )
+
 
     
 
@@ -73,12 +104,15 @@ app.post('/run', function(req, res){
     Observable
         .concat(...todo)
         .reduce((acc, cur) => [...acc, cur], [])
+        .flatMap(r => background ? runCommand(`pdftk ${pathPDF} background ${pathBackgroundPdf} output ${pathBackgroundPdfMerged}`).then(r => pathPDF = pathBackgroundPdfMerged) : Observable.of(r))
         .subscribe(
             result => {
+                res.header('Content-Type: application/pdf')
+                // res.sendFile(pathPDF)
                 res.json({
                     pdf: new Buffer(fs.readFileSync(pathPDF)).toString('base64')
                 })
-            }, //res.sendFile(pathPDF),
+            },
             error => {
                 console.error(error)
                 res.status(500).json({

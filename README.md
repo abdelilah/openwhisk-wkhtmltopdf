@@ -6,4 +6,5 @@ Docker action for openwhisk to generate PDF files using wkhtmltopdf
 * content: HTML content
 * header: HTML content for header (equivalent to wkhtmltopdf --header-html option)
 * footer: HTML content for footer (equivalent to wkhtmltopdf --footer-html option)
+* background: Base64 encoded background image
 * options: additional wkhtmltopdf command line arguments
