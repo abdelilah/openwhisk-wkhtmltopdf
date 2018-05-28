@@ -57,6 +57,7 @@ app.post('/run', function(req, res){
     let todo = []
 
     // Write files
+    console.log('Content size', content.length)
     todo.push(
         new Promise((resolve, reject) => {
             fs.writeFile(pathContent, content, resolve)
@@ -64,6 +65,8 @@ app.post('/run', function(req, res){
     )
 
     if(background){
+        console.log('Background size', background.length)
+
         todo.push(
             new Promise((resolve, reject) => {
                 fs.writeFile(pathBackgroundImg, Buffer.from(background, 'base64'), resolve)
@@ -76,6 +79,8 @@ app.post('/run', function(req, res){
     }
 
     if(header){
+        console.log('Header size', header.length)
+
         pdfOptions.push('--header-html ' + pathHeader)
         todo.push(
             new Promise((resolve, reject) => {
@@ -85,6 +90,8 @@ app.post('/run', function(req, res){
     }
 
     if(footer){
+        console.log('Footer size', footer.length)
+
         pdfOptions.push('--footer-html ' + pathFooter)
         todo.push(
             new Promise((resolve, reject) => {
