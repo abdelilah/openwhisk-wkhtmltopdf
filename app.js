@@ -110,6 +110,10 @@ app.post('/run', function(req, res){
     // Generate PDF
     Observable
         .concat(...todo)
+        .retryWhen((err) => {
+            console.log('An error occured, retrying...', err);
+            return err.delay(1000).take(3); // 3 times
+        })
         .reduce((acc, cur) => [...acc, cur], [])
         .flatMap(r => background ? runCommand(`pdftk ${pathPDF} background ${pathBackgroundPdf} output ${pathBackgroundPdfMerged}`).then(r => pathPDF = pathBackgroundPdfMerged) : Observable.of(r))
         .subscribe(
